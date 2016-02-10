@@ -117,6 +117,8 @@ module Appsignal
       )
     rescue JSON::GeneratorError=>e
       Appsignal.logger.error("JSON generate error (#{e.message}) for '#{data.inspect}'")
+    rescue Encoding::UndefinedConversionError=>e
+      Appsignal.logger.error("Sample data conversion error (#{e.message}) for '#{data.inspect}'")
     end
 
     def sample_data
