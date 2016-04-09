@@ -7,7 +7,7 @@ describe Appsignal::Config do
     let(:config) { project_fixture_config('production') }
 
     it "should not log an error" do
-      Appsignal::Config.any_instance.should_not_receive(:carefully_log_error)
+      Logger.any_instance.should_not_receive(:log_error)
       subject
     end
 
@@ -32,7 +32,7 @@ describe Appsignal::Config do
         :enable_frontend_error_catching => false,
         :frontend_error_catching_path   => '/appsignal_error_catcher',
         :enable_allocation_tracking     => true,
-        :enable_gc_instrumentation      => true,
+        :enable_gc_instrumentation      => false,
         :running_in_container           => false
       }
     end
@@ -65,9 +65,14 @@ describe Appsignal::Config do
       end
     end
 
-    describe "#[]" do
+    describe "#[]= and #[]" do
       it "should get the value for an existing key" do
         subject[:push_api_key].should == 'abc'
+      end
+
+      it "should change and get the value for an existing key" do
+        subject[:push_api_key] = 'abcde'
+        subject[:push_api_key].should == 'abcde'
       end
 
       it "should return nil for a non-existing key" do
@@ -98,6 +103,18 @@ describe Appsignal::Config do
         ENV['APPSIGNAL_HTTP_PROXY'].should                   == 'http://localhost'
         ENV['APPSIGNAL_IGNORE_ACTIONS'].should               == 'action1,action2'
         ENV['APPSIGNAL_RUNNING_IN_CONTAINER'].should         == 'false'
+        ENV['APPSIGNAL_WORKING_DIR_PATH'].should             be_nil
+      end
+
+      context "if working_dir_path is set" do
+        before do
+          subject.config_hash[:working_dir_path] = '/tmp/appsignal2'
+          subject.write_to_environment
+        end
+
+        it "should write the current config to env vars" do
+          ENV['APPSIGNAL_WORKING_DIR_PATH'].should == '/tmp/appsignal2'
+        end
       end
     end
 
@@ -161,10 +178,10 @@ describe Appsignal::Config do
     let(:config) { project_fixture_config('nonsense') }
 
     it "should log an error" do
-      Appsignal::Config.any_instance.should_receive(:carefully_log_error).with(
+      Logger.any_instance.should_receive(:error).with(
         "Not loading from config file: config for 'nonsense' not found"
       ).once
-      Appsignal::Config.any_instance.should_receive(:carefully_log_error).with(
+      Logger.any_instance.should_receive(:error).with(
         "Push api key not set after loading config"
       ).once
       subject

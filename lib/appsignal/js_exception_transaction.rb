@@ -28,7 +28,7 @@ module Appsignal
         @transaction_index,
         @data['name'],
         @data['message'],
-        JSON.generate(@data['backtrace'])
+        Appsignal::Utils.json_generate(@data['backtrace'])
       )
     end
 
@@ -43,7 +43,7 @@ module Appsignal
           Appsignal::Extension.set_transaction_sample_data(
             @transaction_index,
             key.to_s,
-            JSON.generate(data)
+            Appsignal::Utils.json_generate(data)
           )
         rescue JSON::GeneratorError=>e
           Appsignal.logger.error("JSON generate error (#{e.message}) for '#{data.inspect}'")
@@ -53,6 +53,7 @@ module Appsignal
 
     def complete!
       Appsignal::Extension.finish_transaction(@transaction_index)
+      Appsignal::Extension.complete_transaction(@transaction_index)
     end
   end
 end

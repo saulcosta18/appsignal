@@ -32,7 +32,7 @@ module Appsignal
 
     attr_reader :transaction_index, :transaction_id, :namespace, :request, :paused, :tags, :options
 
-    def initialize(transaction_id, namespace, request, options)
+    def initialize(transaction_id, namespace, request, options={})
       @transaction_id = transaction_id
       @namespace = namespace
       @request = request
@@ -113,7 +113,7 @@ module Appsignal
       Appsignal::Extension.set_transaction_sample_data(
         transaction_index,
         key.to_s,
-        JSON.generate(data)
+        Appsignal::Utils.json_generate(data)
       )
     rescue JSON::GeneratorError=>e
       Appsignal.logger.error("JSON generate error (#{e.message}) for '#{data.inspect}'")
@@ -126,6 +126,7 @@ module Appsignal
         :params       => sanitized_params,
         :environment  => sanitized_environment,
         :session_data => sanitized_session_data,
+        :metadata     => metadata,
         :tags         => sanitized_tags
       }.each do |key, data|
         set_sample_data(key, data)
@@ -142,8 +143,8 @@ module Appsignal
       Appsignal::Extension.set_transaction_error(
         transaction_index,
         error.class.name,
-        error.message,
-        backtrace ? JSON.generate(backtrace) : ''
+        error.message.to_s,
+        backtrace ? Appsignal::Utils.json_generate(backtrace) : ''
       )
     rescue JSON::GeneratorError=>e
       Appsignal.logger.error("JSON generate error (#{e.message}) for '#{backtrace.inspect}'")
@@ -212,6 +213,11 @@ module Appsignal
       return if Appsignal.config[:skip_session_data] || !request.respond_to?(:session)
       return unless session = request.session
       Appsignal::ParamsSanitizer.sanitize(session.to_hash)
+    end
+
+    def metadata
+      return unless request.env
+      request.env[:metadata]
     end
 
     # Only keep tags if they meet the following criteria:

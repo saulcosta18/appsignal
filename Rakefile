@@ -1,5 +1,4 @@
 require 'rspec/core/rake_task'
-
 GEMFILES = %w(
   capistrano2
   capistrano3
@@ -13,6 +12,7 @@ GEMFILES = %w(
   resque
   sequel
   sinatra
+  grape
 )
 
 RUBY_VERSIONS = %w(

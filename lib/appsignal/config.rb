@@ -1,12 +1,9 @@
 require 'erb'
 require 'yaml'
 require 'uri'
-require 'appsignal/integrations/capistrano/careful_logger'
 
 module Appsignal
   class Config
-    include Appsignal::CarefulLogger
-
     DEFAULT_CONFIG = {
       :debug                          => false,
       :ignore_errors                  => [],
@@ -20,7 +17,7 @@ module Appsignal
       :enable_frontend_error_catching => false,
       :frontend_error_catching_path   => '/appsignal_error_catcher',
       :enable_allocation_tracking     => true,
-      :enable_gc_instrumentation      => true,
+      :enable_gc_instrumentation      => false,
       :running_in_container           => false
     }.freeze
 
@@ -42,10 +39,12 @@ module Appsignal
       'APPSIGNAL_HTTP_PROXY'                     => :http_proxy,
       'APPSIGNAL_ENABLE_ALLOCATION_TRACKING'     => :enable_allocation_tracking,
       'APPSIGNAL_ENABLE_GC_INSTRUMENTATION'      => :enable_gc_instrumentation,
-      'APPSIGNAL_RUNNING_IN_CONTAINER'           => :running_in_container
+      'APPSIGNAL_RUNNING_IN_CONTAINER'           => :running_in_container,
+      'APPSIGNAL_WORKING_DIR_PATH'               => :working_dir_path
     }.freeze
 
     attr_reader :root_path, :env, :initial_config, :config_hash
+    attr_accessor :logger
 
     def initialize(root_path, env, initial_config={}, logger=Appsignal.logger)
       @root_path      = root_path
@@ -71,6 +70,10 @@ module Appsignal
 
     def [](key)
       config_hash[key]
+    end
+
+    def []=(key, value)
+      config_hash[key] = value
     end
 
     def log_file_path
@@ -103,6 +106,7 @@ module Appsignal
       ENV['APPSIGNAL_HTTP_PROXY']                   = config_hash[:http_proxy]
       ENV['APPSIGNAL_IGNORE_ACTIONS']               = config_hash[:ignore_actions].join(',')
       ENV['APPSIGNAL_RUNNING_IN_CONTAINER']         = config_hash[:running_in_container].to_s
+      ENV['APPSIGNAL_WORKING_DIR_PATH']             = config_hash[:working_dir_path] if config_hash[:working_dir_path]
     end
 
     protected
@@ -131,7 +135,7 @@ module Appsignal
 
         merge(@config_hash, config_for_this_env)
       else
-        carefully_log_error("Not loading from config file: config for '#{env}' not found")
+        @logger.error "Not loading from config file: config for '#{env}' not found"
       end
     end
 
@@ -150,7 +154,8 @@ module Appsignal
 
       # Configuration with string type
       %w(APPSIGNAL_PUSH_API_KEY APPSIGNAL_APP_NAME APPSIGNAL_PUSH_API_ENDPOINT
-         APPSIGNAL_FRONTEND_ERROR_CATCHING_PATH APPSIGNAL_HTTP_PROXY APPSIGNAL_LOG_PATH).each do |var|
+         APPSIGNAL_FRONTEND_ERROR_CATCHING_PATH APPSIGNAL_HTTP_PROXY APPSIGNAL_LOG_PATH
+         APPSIGNAL_WORKING_DIR_PATH).each do |var|
         if env_var = ENV[var]
           config[ENV_TO_KEY_MAPPING[var]] = env_var
         end
@@ -199,7 +204,7 @@ module Appsignal
         @valid = true
       else
         @valid = false
-        carefully_log_error("Push api key not set after loading config")
+        @logger.error "Push api key not set after loading config"
       end
     end
 
